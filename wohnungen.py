@@ -4,6 +4,7 @@ import bs4
 import requests
 import hashlib
 import telegram
+import os.environ
 
 def compare(entries, name):
     hashes = set()
@@ -181,7 +182,7 @@ for name, m in all_methods.items():
         new_entries = compare(data, name)
         print(new_entries)
         if(len(new_entries) > 0):
-            bot = telegram.Bot(token='526846149:AAFNiHNpFim5oo8U47mx9SZiI-Ei1DIgcQA')
+            bot = telegram.Bot(token=os.environ['TELEGRAM_TOKEN'])
             msg_text = 'Neue Ergebnisse von ' + name + '\n\n'
             for e in new_entries:
                 msg_text += e['text'] + '\n\n'
