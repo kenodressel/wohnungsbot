@@ -187,7 +187,7 @@ for name, m in all_methods.items():
             bot = telegram.Bot(token=os.environ['TELEGRAM_TOKEN'])
             msg_text = 'Neue Ergebnisse von ' + name + '\n\n'
             for e in new_entries:
-                msg_text += e['text'] + '\n\n'
+                msg_text += e['text'] + '\n' + e['link'] + '\n\n'
 
             bot.send_message(chat_id=os.environ['TELEGRAM_CHAT_ID'],text=msg_text);
     except:
