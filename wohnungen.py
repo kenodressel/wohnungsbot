@@ -5,6 +5,7 @@ import requests
 import hashlib
 import telegram
 import re
+import sys
 
 def compare(entries, name):
     hashes = set()
@@ -191,4 +192,5 @@ for name, m in all_methods.items():
 
             bot.send_message(chat_id=os.environ['TELEGRAM_CHAT_ID'],text=msg_text);
     except:
+    	print("Unexpected error:", sys.exc_info()[0])
         print("could not fetch data from " + name)
