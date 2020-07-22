@@ -1,10 +1,10 @@
-import os.path
+import os
 import pickle
 import bs4
 import requests
 import hashlib
 import telegram
-import os.environ
+import re
 
 def compare(entries, name):
     hashes = set()
@@ -19,8 +19,11 @@ def compare(entries, name):
     return new_entries
 
 def getElvira():
-    r = requests.get('http://site20.elviraimmobiliengmbh.netcore.web2.onoffice.de/mietobjekte.xhtml')
+    return []# currently broken
+    r = requests.post('http://site20.elviraimmobiliengmbh.netcore.web2.onoffice.de/mietobjekte.xhtml')
     b = bs4.BeautifulSoup(r.text, "html5lib")
+    print(r.text)
+    return
     lists = b.find_all('div', class_='full')
     entries = lists[1].find_all('div', class_='object-object')
     found_entities = []
@@ -39,33 +42,34 @@ def getElvira():
     return found_entities
 
 def getAigner():
-    page = 1
-    total_results = []
     data_RAW = {
         "action_form":"ajax_immo_search",
         "auslandImmos":"0",
-        "extraAjaxFile":"/modules/pageFramesAndModules/__frames/custom/immoSearchResult_2018",
-        "fid":"5998",
+        "fid":"1931",
         "immoType":"IMMOBILIEN",
-        "objektart":"WOHNUNG",
-        "objekteProSeite":"50",
-        "page":str(page),
-        "region":"DB+O+CG+",
-        "vermarktungsart":"MIETE_PACHT"
+        "objekteProSeite":"999",
+        "plz":"8",
+        "page": "1",
+        "validVermarktungsarten":"MIETE_PACHT",
+        "auslandImmos":"0",
+        "extraAjaxFile": "//modules/pageFramesAndModules/__frames/immoSearchResult/immoSearchResult_004"
     }
 
-    r = requests.post('https://www.aigner-immobilien.de/inc/modules/ajax.includes.php', data=data_RAW, verify=False)
-    results = r.json()['mapData']
-    total_results += results
+    r = requests.post('https://www.mietwohnungsboerse.de/inc/modules/ajax.includes.php', data=data_RAW)
+    b = bs4.BeautifulSoup(r.text, "html5lib")
+    
+    entries = b.find_all('div', class_='immo-box')
     found_entities = []
-    for entry in total_results:
+    for e in entries:
         str_sum = ''
-        str_sum += str(entry['flaeche']['value']) + '\n'
-        str_sum += str(entry['iconData']['schlafen']) + '-Zimmer' + '\n'
-        str_sum += str(entry['location']) + '\n'
-        str_sum += str(entry['preis']['original']) + str(entry['preis']['text']) + '\n'
+        str_sum += str(e.find('div',class_='immo-desc').text.strip()) + '\n'
+        str_sum += str(e.find('div',class_='immo-ort').text.strip()) + '\n'
+        str_sum += str(e.find('div',class_='immo-preis-label').text.strip()) + '\n'
+        str_sum += str(e.find('div',class_='immo-preis-value').text.strip()) + '\n'
+        link = 'https://www.mietwohnungsboerse.de' + str(e.find('a')['href'])
         found_entities.append({
             "text": str_sum,
+            "link": link,
             "hash": hashlib.sha1(str.encode(str_sum)).hexdigest()
         })
     return found_entities
@@ -73,21 +77,25 @@ def getAigner():
 def getGerschlauer():
     r = requests.get('https://www.gerschlauer.de/property-search/?location=muenchen&status=zu-vermieten&type=wohnungen', verify=False)
     b = bs4.BeautifulSoup(r.text, "html5lib")
-    lists = b.find_all('div', class_='property-items-container')
-    entries = lists[0].find_all('div', class_='span6')
+    lists = b.find_all('div', class_='list-container')
+    entries = lists[0].find_all('article', class_='property-item')
     found_entities = []
     for e in entries:
         str_sum = ''
         str_sum += str(e.find('h4').text.strip()) + '\n'
         str_sum += str(e.find('h5',class_='price').text.strip()) + '\n'
+        str_sum += str(e.find('span',class_='property-meta-size').text.strip()) + '\n'
+        str_sum = re.sub('\xa0', '', str_sum)
+        link = str(e.find('a',class_='more-details')['href'])
         found_entities.append({
             "text": str_sum,
+            "link": link,
             "hash": hashlib.sha1(str.encode(str_sum)).hexdigest()
         })
     return found_entities
 
 def getHegerich():
-    r = requests.get('https://www.hegerich-immobilien.de/Mietangebote.htm', verify=False)
+    r = requests.get('https://www.hegerich-immobilien.de/Mietangebote.htm')
     b = bs4.BeautifulSoup(r.text, "html5lib")
     lists = b.find_all('div', class_='infiniteresults')
     entries = lists[0].find_all('div', class_='objekt')
@@ -97,69 +105,60 @@ def getHegerich():
         str_sum += str(e.find('h3').text.strip()) + '\n'
         str_sum += str(e.find('div',class_='preis').text.strip()) + '\n'
         infos = e.find_all('div', class_='info')
+        link = 'https://www.hegerich-immobilien.de' + str(e.find('h3').find('a')['href'])
         if(len(infos) > 0):
             str_sum += str(infos[0].text.strip()) + '\n'
             str_sum += str(infos[1].text.strip()) + '\n'
-        found_entities.append({
-            "text": str_sum,
-            "hash": hashlib.sha1(str.encode(str_sum)).hexdigest()
-        })
+        if "München" in str(e.find('div',class_='ort').text.strip()):
+            found_entities.append({
+                "text": str_sum,
+                "link": link,
+                "hash": hashlib.sha1(str.encode(str_sum)).hexdigest()
+            })
     return found_entities
     
 def getSchneider():
-    r = requests.get('https://www.immobilienschneider.com/aktuelle-angebote/wohnung-muenchen-miete', verify=False)
+    r = requests.get('https://www.immobilienschneider.com/aktuelle-angebote/wohnung-muenchen-miete')
     b = bs4.BeautifulSoup(r.text, "html5lib")
-    lists = b.find_all('div', class_='je-items-item-box')
-    entries = lists[0].find_all('div', class_='data-cd-grid-match')
+    lists = b.find_all('div', class_='jomestate')
+    entries = lists[0].find_all('div', class_='card')
     found_entities = []
     for e in entries:
         str_sum = ''
-        str_sum += str(e.find('a',class_='je-items-item-title').text.strip()) + '\n'
-        str_sum += str(e.find('div',class_='je-items-price').text.strip()) + '\n'
-        if(len(e.find_all('span', class_='cd-customfield-value')) > 0):
-            str_sum += str(e.find_all('span', class_='cd-customfield-value')[0].text) + '\n'
-            str_sum += str(e.find_all('span', class_='cd-customfield-value')[1].text) + '\n'
+        str_sum += str(e.find('h3').text.strip()) + '\n'
+        str_sum += str(e.find('address').text.strip()) + '\n'
+        str_sum += str(e.find('div',class_='price').text.strip()) + '\n'
+        link = str(e.find('h3').find('a')['href'])
         found_entities.append({
             "text": str_sum,
+            "link": link,
             "hash": hashlib.sha1(str.encode(str_sum)).hexdigest()
         })
     return found_entities
 
 def getRiedel():
-    r = requests.get('https://www.riedel-immobilien.de/angebote/wohnungen/?mt=67555823520346', verify=False)
+    r = requests.get('https://www.riedel-immobilien.de/angebote?field_marketing_type_value[RENT]=RENT')
     b = bs4.BeautifulSoup(r.text, "html5lib")
-    lists = b.find_all('div', class_='elementList')
-    entries = lists[0].find_all('div', class_='listEntryContent')
+    lists = b.find_all('div', class_='property-search-result')
+    entries = lists[0].find_all('div', class_='property-item')
     found_entities = []
     for e in entries:
         str_sum = ''
-        str_sum += str(e.find('div',class_='listEntryHeadline').text.strip()) + '\n'
-        str_sum += str(e.find('div',class_='listEntryRegion').text.strip()) + '\n'
-        str_sum += str(e.find_all('div', class_='objektDataValue')[1].text) + '\n'
-        str_sum += str(e.find_all('div', class_='objektDataValue')[2].text) + '\n'
+        str_sum += str(e.find('h3').text.strip()) + '\n'
+        str_sum += str(e.find('div',class_='location').find('span').text.strip()) + '\n'
+        information = str(e.find('div', class_='information').text.strip())
+        re.sub(' +', ' ', 'The     quick brown    fox')
+        str_sum += re.sub('\n', '', re.sub(' +', ' ', information)) + '\n'
+        link =  str(e.find('a')['href'])
         found_entities.append({
             "text": str_sum,
+            "link": link,
             "hash": hashlib.sha1(str.encode(str_sum)).hexdigest()
         })
     return found_entities
 
 def getRogers():
-    page = 1
-    total_results = []
-    data_RAW = {
-        "action":"extra_blog_feed_get_content",
-        "blog_feed_module_type":"standard",
-        "blog_feed_nonce":"7d37f707ea",
-        "categories":"5",
-        "content_length":"excerpt",
-        "date_format":"M+j,+Y",
-        "et_load_builder_modules":"1",
-        "posts_per_page":"20",
-        "to_page":"1",
-        "vermarktungsart":"MIETE_PACHT"
-    }
-
-    r = requests.post('https://www.rogers-immobilien.de/wp-admin/admin-ajax.php', data=data_RAW, verify=False)
+    r = requests.get('https://www.rogers-immobilien.de/immobilien-muenchen/immobilienangebote/')
     b = bs4.BeautifulSoup(r.text, "html5lib")
     lists = b.find('div', class_='paginated_page')
     entries = lists.find_all('article', class_='post')
@@ -167,10 +166,13 @@ def getRogers():
     for e in entries:
         str_sum = ''
         str_sum += str(e.find('div',class_='entry-summary').text.strip())
-        found_entities.append({
-            "text": str_sum,
-            "hash": hashlib.sha1(str.encode(str_sum)).hexdigest()
-        })
+        link = str(e.find('a',class_='read-more-button')['href'])
+        if "KAUFPREIS" not in str_sum and "ERFOLGREICH VERMITTELT" not in str_sum:
+            found_entities.append({
+                "text": str_sum,
+                "link": link,
+                "hash": hashlib.sha1(str.encode(str_sum)).hexdigest()
+            })
     return found_entities
 
 print("Running Script")
@@ -187,6 +189,6 @@ for name, m in all_methods.items():
             for e in new_entries:
                 msg_text += e['text'] + '\n\n'
 
-            bot.send_message(chat_id='-297159408',text=msg_text);
+            bot.send_message(chat_id=os.environ['TELEGRAM_CHAT_ID'],text=msg_text);
     except:
         print("could not fetch data from " + name)
