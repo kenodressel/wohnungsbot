@@ -129,7 +129,7 @@ def getSchneider():
         str_sum += str(e.find('h3').text.strip()) + '\n'
         str_sum += str(e.find('address').text.strip()) + '\n'
         str_sum += str(e.find('div',class_='price').text.strip()) + '\n'
-        link = 'https://www.immobilienschneider.com/' + str(e.find('h3').find('a')['href'])
+        link = 'https://www.immobilienschneider.com' + str(e.find('h3').find('a')['href'])
         found_entities.append({
             "text": str_sum,
             "link": link,
@@ -149,7 +149,7 @@ def getRiedel():
         str_sum += str(e.find('div',class_='location').find('span').text.strip()) + '\n'
         information = str(e.find('div', class_='information').text.strip())
         str_sum += re.sub('\n', '', re.sub(' +', ' ', information)) + '\n'
-        link = 'https://www.riedel-immobilien.de/' + str(e.find('a')['href'])
+        link = 'https://www.riedel-immobilien.de' + str(e.find('a')['href'])
         found_entities.append({
             "text": str_sum,
             "link": link,
