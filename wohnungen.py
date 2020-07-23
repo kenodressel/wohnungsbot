@@ -76,7 +76,7 @@ def getAigner():
     return found_entities
 
 def getGerschlauer():
-    r = requests.get('https://www.gerschlauer.de/property-search/?location=muenchen&status=zu-vermieten&type=wohnungen', verify=False)
+    r = requests.get('https://www.gerschlauer.de/property-search/?location=muenchen&status=zu-vermieten&type=wohnungen')
     b = bs4.BeautifulSoup(r.text, "html5lib")
     lists = b.find_all('div', class_='list-container')
     entries = lists[0].find_all('article', class_='property-item')
@@ -129,7 +129,7 @@ def getSchneider():
         str_sum += str(e.find('h3').text.strip()) + '\n'
         str_sum += str(e.find('address').text.strip()) + '\n'
         str_sum += str(e.find('div',class_='price').text.strip()) + '\n'
-        link = str(e.find('h3').find('a')['href'])
+        link = 'https://www.immobilienschneider.com/' + str(e.find('h3').find('a')['href'])
         found_entities.append({
             "text": str_sum,
             "link": link,
@@ -148,9 +148,8 @@ def getRiedel():
         str_sum += str(e.find('h3').text.strip()) + '\n'
         str_sum += str(e.find('div',class_='location').find('span').text.strip()) + '\n'
         information = str(e.find('div', class_='information').text.strip())
-        re.sub(' +', ' ', 'The     quick brown    fox')
         str_sum += re.sub('\n', '', re.sub(' +', ' ', information)) + '\n'
-        link =  str(e.find('a')['href'])
+        link = 'https://www.riedel-immobilien.de/' + str(e.find('a')['href'])
         found_entities.append({
             "text": str_sum,
             "link": link,
