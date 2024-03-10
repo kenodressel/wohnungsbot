@@ -20,11 +20,8 @@ def compare(entries, name):
     return new_entries
 
 def getElvira():
-    return []# currently broken
     r = requests.post('http://site20.elviraimmobiliengmbh.netcore.web2.onoffice.de/mietobjekte.xhtml')
     b = bs4.BeautifulSoup(r.text, "html5lib")
-    print(r.text)
-    return
     lists = b.find_all('div', class_='full')
     entries = lists[1].find_all('div', class_='object-object')
     found_entities = []
@@ -36,8 +33,10 @@ def getElvira():
             str_sum += str(infos[0].text.strip()) + '\n'
             str_sum += str(infos[1].text.strip()) + '\n'
             str_sum += str(infos[2].text.strip()) + '\n'
+        link = 'http://site20.elviraimmobiliengmbh.netcore.web2.onoffice.de/' + str(e.find('a', class_="link")['href'])
         found_entities.append({
             "text": str_sum,
+            "link": link,
             "hash": hashlib.sha1(str.encode(str_sum)).hexdigest()
         })
     return found_entities
