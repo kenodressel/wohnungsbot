@@ -160,13 +160,15 @@ def getRiedel():
 def getRogers():
     r = requests.get('https://www.rogers-immobilien.de/immobilien-muenchen/immobilienangebote/')
     b = bs4.BeautifulSoup(r.text, "html5lib")
-    lists = b.find('div', class_='paginated_page')
-    entries = lists.find_all('article', class_='post')
+    lists = b.find('div', class_='et_pb_posts')
+    entries = lists.find_all('article', class_='et_pb_post')
     found_entities = []
     for e in entries:
         str_sum = ''
-        str_sum += str(e.find('div',class_='entry-summary').text.strip())
-        link = str(e.find('a',class_='read-more-button')['href'])
+        str_sum += str(e.find('h2',class_='entry-title').text.strip())
+        information = str(e.find('div', class_='post-data').text.strip())
+        str_sum += re.sub('\n', '', re.sub(' +', ' ', information)) + '\n'
+        link = str(e.find('a',class_='et_pb_button')['href'])
         if "KAUFPREIS" not in str_sum and "ERFOLGREICH VERMITTELT" not in str_sum:
             found_entities.append({
                 "text": str_sum,
