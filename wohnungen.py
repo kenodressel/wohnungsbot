@@ -119,17 +119,19 @@ def getHegerich():
     return found_entities
     
 def getSchneider():
-    r = requests.get('https://www.immobilienschneider.com/aktuelle-angebote/wohnung-muenchen-miete')
+    r = requests.get('https://www.immobilienschneider.com/mietangebote/')
     b = bs4.BeautifulSoup(r.text, "html5lib")
-    lists = b.find_all('div', class_='jomestate')
-    entries = lists[0].find_all('div', class_='card')
+    lists = b.find_all('div', class_='et_pb_code_inner')
+    entries = lists[0].find_all('div', class_='oo-listframe')
     found_entities = []
     for e in entries:
         str_sum = ''
-        str_sum += str(e.find('h3').text.strip()) + '\n'
-        str_sum += str(e.find('address').text.strip()) + '\n'
-        str_sum += str(e.find('div',class_='price').text.strip()) + '\n'
-        link = 'https://www.immobilienschneider.com' + str(e.find('h3').find('a')['href'])
+        str_sum += str(e.find('div',class_='oo-listtitle').text.strip()) + '\n'
+        information = [info for info in e.find('div',class_='oo-listinfotable').findAll('div', class_='oo-listtd')]
+        for index, info in enumerate(information):
+            str_sum += info.text
+            str_sum = str_sum + '\n' if (index + 1) % 2 == 0 else str_sum
+        link = 'https://www.immobilienschneider.com' + str(e.find('div',class_='oo-detailslink').find('a', class_='oo-details-btn')['href'])
         found_entities.append({
             "text": str_sum,
             "link": link,
