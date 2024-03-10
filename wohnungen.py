@@ -138,16 +138,16 @@ def getSchneider():
     return found_entities
 
 def getRiedel():
-    r = requests.get('https://www.riedel-immobilien.de/angebote?field_marketing_type_value[RENT]=RENT')
+    r = requests.get('https://www.riedel-immobilien.de/angebote/wohnungen-mieten')
     b = bs4.BeautifulSoup(r.text, "html5lib")
-    lists = b.find_all('div', class_='property-search-result')
-    entries = lists[0].find_all('div', class_='property-item')
+    lists = b.find_all('ul', class_='listDefault_varImmobox')
+    entries = lists[0].find_all('div', class_='listEntryInner')
     found_entities = []
     for e in entries:
         str_sum = ''
         str_sum += str(e.find('h3').text.strip()) + '\n'
-        str_sum += str(e.find('div',class_='location').find('span').text.strip()) + '\n'
-        information = str(e.find('div', class_='information').text.strip())
+        str_sum += str(e.find('div',class_='listEntryLocationShort').text.strip()) + '\n'
+        information = str(e.find('div', class_='listEntryObjektdaten').text.strip())
         str_sum += re.sub('\n', '', re.sub(' +', ' ', information)) + '\n'
         link = 'https://www.riedel-immobilien.de' + str(e.find('a')['href'])
         found_entities.append({
