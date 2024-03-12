@@ -186,11 +186,11 @@ def getRogers():
 
 print("Running Script")
 
-all_methods = { "aigner": getAigner, "rogers":getRogers, "riedel":getRiedel, "schneider":getSchneider, "hegerich":getHegerich, "gerschlauer":getGerschlauer, "elvira":getElvira};
+all_methods = { "aigner": getAigner, "rogers":getRogers, "riedel":getRiedel, "schneider":getSchneider, "hegerich":getHegerich, "gerschlauer":getGerschlauer, "elvira":getElvira}
 # all_methods = { "schneider":getSchneider};
 for name, m in all_methods.items():
     try:
-        data = m();
+        data = m()
         new_entries = compare(data, name)
         print(new_entries)
         if(len(new_entries) > 0):
@@ -199,7 +199,7 @@ for name, m in all_methods.items():
             for e in new_entries:
                 msg_text += e['text'] + '\n' + e['link'] + '\n\n'
 
-            bot.send_message(chat_id=os.environ['TELEGRAM_CHAT_ID'],text=msg_text);
+            bot.send_message(chat_id=os.environ['TELEGRAM_CHAT_ID'],text=msg_text)
     except:
         print("Unexpected error:", sys.exc_info()[0])
         print("could not fetch data from " + name)
