@@ -6,10 +6,12 @@ import hashlib
 import telegram
 import re
 import sys
+from pathlib import Path
 
 PICKLE_PATH = './data/'
 
 def compare(entries, name):
+    Path(PICKLE_PATH).mkdir(parents=True, exist_ok=True)
     hashes = set()
     if(os.path.isfile(PICKLE_PATH + name + '.pickle')):
         with open(PICKLE_PATH + name + '.pickle','rb') as f:
@@ -184,8 +186,8 @@ def getRogers():
 
 print("Running Script")
 
-#all_methods = { "aigner": getAigner, "rogers":getRogers, "riedel":getRiedel, "schneider":getSchneider, "hegerich":getHegerich, "gerschlauer":getGerschlauer, "elvira":getElvira};
-all_methods = { "schneider":getSchneider};
+all_methods = { "aigner": getAigner, "rogers":getRogers, "riedel":getRiedel, "schneider":getSchneider, "hegerich":getHegerich, "gerschlauer":getGerschlauer, "elvira":getElvira};
+# all_methods = { "schneider":getSchneider};
 for name, m in all_methods.items():
     try:
         data = m();
