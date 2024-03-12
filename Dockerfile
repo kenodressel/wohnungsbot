@@ -6,7 +6,7 @@ RUN apt-get update \
     apt-get install --no-install-recommends --assume-yes \
       cron
 
-RUN echo '* * * * * /root/cronscript.sh > /proc/1/fd/1 2>/proc/1/fd/2' | crontab
+RUN echo '*/15 * * * * /root/cronscript.sh > /proc/1/fd/1 2>/proc/1/fd/2' | crontab
 
 COPY requirements.txt ./requirements.txt
 
