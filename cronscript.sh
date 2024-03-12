@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 echo "Job started: $(date)"
-python /root/wohnungen.py
+/usr/local/bin/python /root/wohnungen.py
 echo "Job finished: $(date)"
