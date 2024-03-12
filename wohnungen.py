@@ -120,8 +120,8 @@ def getHegerich():
 def getSchneider():
     r = requests.get('https://www.immobilienschneider.com/mietangebote/')
     b = bs4.BeautifulSoup(r.text, "html5lib")
-    lists = b.find_all('div', class_='et_pb_code_inner')
-    entries = lists[0].find_all('div', class_='oo-listframe')
+    lists = b.find_all('div', class_='oo-listframe')
+    entries = lists[0].find_all('div', class_='oo-listobject')
     found_entities = []
     for e in entries:
         str_sum = ''
@@ -130,7 +130,9 @@ def getSchneider():
         for index, info in enumerate(information):
             str_sum += info.text
             str_sum = str_sum + '\n' if (index + 1) % 2 == 0 else str_sum
-        link = 'https://www.immobilienschneider.com' + str(e.find('div',class_='oo-detailslink').find('a', class_='oo-details-btn')['href'])
+        link = str(e.find('div',class_='oo-detailslink').find('a', class_='oo-details-btn')['href'])
+        if "BÜROFLÄCHE" in str_sum.upper() or "BÜROHAUS" in str_sum.upper():
+            continue
         found_entities.append({
             "text": str_sum,
             "link": link,
@@ -180,7 +182,8 @@ def getRogers():
 
 print("Running Script")
 
-all_methods = { "aigner": getAigner, "rogers":getRogers, "riedel":getRiedel, "schneider":getSchneider, "hegerich":getHegerich, "gerschlauer":getGerschlauer, "elvira":getElvira};
+#all_methods = { "aigner": getAigner, "rogers":getRogers, "riedel":getRiedel, "schneider":getSchneider, "hegerich":getHegerich, "gerschlauer":getGerschlauer, "elvira":getElvira};
+all_methods = { "schneider":getSchneider};
 for name, m in all_methods.items():
     try:
         data = m();
