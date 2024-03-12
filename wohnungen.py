@@ -7,14 +7,16 @@ import telegram
 import re
 import sys
 
+PICKLE_PATH = './data/'
+
 def compare(entries, name):
     hashes = set()
-    if(os.path.isfile('./' + name + '.pickle')):
-        with open('./' + name + '.pickle','rb') as f:
+    if(os.path.isfile(PICKLE_PATH + name + '.pickle')):
+        with open(PICKLE_PATH + name + '.pickle','rb') as f:
             hashes = pickle.load(f)
     new_entries = [e for e in entries if e['hash'] not in hashes]
     new_hashes = set([e['hash'] for e in new_entries]) | hashes
-    with open('./' + name + '.pickle','wb') as f:
+    with open(PICKLE_PATH + name + '.pickle','wb') as f:
             pickle.dump(new_hashes, f)
     
     return new_entries
