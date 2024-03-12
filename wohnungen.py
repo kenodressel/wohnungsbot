@@ -170,7 +170,7 @@ def getRogers():
         information = str(e.find('div', class_='post-data').text.strip())
         str_sum += re.sub('\n', '', re.sub(' +', ' ', information)) + '\n'
         link = str(e.find('a',class_='et_pb_button')['href'])
-        if "KAUFPREIS" not in str_sum and "ERFOLGREICH VERMITTELT" not in str_sum:
+        if "KAUFPREIS" not in str_sum.upper() and "ERFOLGREICH VERMITTELT" not in str_sum.upper():
             found_entities.append({
                 "text": str_sum,
                 "link": link,
