@@ -116,7 +116,7 @@ def getSchneider():
     found = []
     for e in lists[0].find_all('div', class_='oo-listobject'):
         title = e.find('div', class_='oo-listtitle').text.strip()
-        infos = e.find('div', class_='oo-listinfotable').findAll('div', class_='oo-listtd')
+        infos = e.find('div', class_='oo-listinfotable').find_all('div', class_='oo-listtd')
         info_pairs = {}
         for i in range(0, len(infos) - 1, 2):
             key = infos[i].text.strip()
