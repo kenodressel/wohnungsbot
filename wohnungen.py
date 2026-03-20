@@ -4,11 +4,13 @@ import bs4
 import requests
 import hashlib
 import telegram
+import asyncio
 import re
 import sys
 from pathlib import Path
 
 PICKLE_PATH = './data/'
+HEADERS = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'}
 
 def compare(entries, name):
     Path(PICKLE_PATH).mkdir(parents=True, exist_ok=True)
@@ -23,21 +25,30 @@ def compare(entries, name):
     
     return new_entries
 
-def getElvira():
-    r = requests.post('http://site20.elviraimmobiliengmbh.netcore.web2.onoffice.de/mietobjekte.xhtml')
+def getGerschlauer():
+    r = requests.get('https://www.gerschlauer.de/property-search/?location=muenchen&status=zu-vermieten&type=wohnungen', headers=HEADERS)
     b = bs4.BeautifulSoup(r.text, "html5lib")
-    lists = b.find_all('div', class_='full')
-    entries = lists[1].find_all('div', class_='object-object')
+    lists = b.find_all('div', class_='infiniteresults')
+    entries = lists[0].find_all('div', class_='objekt')
     found_entities = []
     for e in entries:
+        preis = e.find('div', class_='preis')
+        if not preis or not preis.find('span', class_='miete'):
+            continue
+        title = e.find('h2')
+        if not title:
+            continue
+        ort = e.find('div', class_='ort')
+        if ort and "München" not in ort.text:
+            continue
         str_sum = ''
-        str_sum += str(e.find('p',class_='hd').text.strip()) + '\n'
-        infos = e.find_all('li')
-        if(len(infos) > 0):
-            str_sum += str(infos[0].text.strip()) + '\n'
-            str_sum += str(infos[1].text.strip()) + '\n'
-            str_sum += str(infos[2].text.strip()) + '\n'
-        link = 'http://site20.elviraimmobiliengmbh.netcore.web2.onoffice.de/' + str(e.find('a', class_="link")['href'])
+        str_sum += title.text.strip() + '\n'
+        str_sum += preis.text.strip() + '\n'
+        infos = e.find_all('div', class_='info')
+        for info in infos:
+            str_sum += info.text.strip() + '\n'
+        link_tag = e.find('a', class_='oldobjekt_detail_link') or e.find('a')
+        link = 'https://www.gerschlauer.de' + str(link_tag['href'])
         found_entities.append({
             "text": str_sum,
             "link": link,
@@ -78,47 +89,34 @@ def getAigner():
         })
     return found_entities
 
-def getGerschlauer():
-    r = requests.get('https://www.gerschlauer.de/property-search/?location=muenchen&status=zu-vermieten&type=wohnungen')
-    b = bs4.BeautifulSoup(r.text, "html5lib")
-    lists = b.find_all('div', class_='list-container')
-    entries = lists[0].find_all('article', class_='property-item')
-    found_entities = []
-    for e in entries:
-        str_sum = ''
-        str_sum += str(e.find('h4').text.strip()) + '\n'
-        str_sum += str(e.find('h5',class_='price').text.strip()) + '\n'
-        str_sum += str(e.find('span',class_='property-meta-size').text.strip()) + '\n'
-        str_sum = re.sub('\xa0', '', str_sum)
-        link = str(e.find('a',class_='more-details')['href'])
-        found_entities.append({
-            "text": str_sum,
-            "link": link,
-            "hash": hashlib.sha1(str.encode(str_sum)).hexdigest()
-        })
-    return found_entities
-
 def getHegerich():
-    r = requests.get('https://www.hegerich-immobilien.de/Mietangebote.htm')
+    r = requests.get('https://www.hegerich-immobilien.de/Mietangebote.htm', headers=HEADERS)
     b = bs4.BeautifulSoup(r.text, "html5lib")
     lists = b.find_all('div', class_='infiniteresults')
     entries = lists[0].find_all('div', class_='objekt')
     found_entities = []
     for e in entries:
         str_sum = ''
-        str_sum += str(e.find('h3').text.strip()) + '\n'
-        str_sum += str(e.find('div',class_='preis').text.strip()) + '\n'
+        title = e.find('h2')
+        if not title:
+            continue
+        str_sum += title.text.strip() + '\n'
+        preis = e.find('div', class_='preis')
+        if preis:
+            str_sum += preis.text.strip() + '\n'
         infos = e.find_all('div', class_='info')
-        link = 'https://www.hegerich-immobilien.de' + str(e.find('h3').find('a')['href'])
-        if(len(infos) > 0):
-            str_sum += str(infos[0].text.strip()) + '\n'
-            str_sum += str(infos[1].text.strip()) + '\n'
-        if "München" in str(e.find('div',class_='ort').text.strip()):
-            found_entities.append({
-                "text": str_sum,
-                "link": link,
-                "hash": hashlib.sha1(str.encode(str_sum)).hexdigest()
-            })
+        for info in infos:
+            str_sum += info.text.strip() + '\n'
+        link_tag = e.find('h2').find('a')
+        link = 'https://www.hegerich-immobilien.de' + str(link_tag['href'])
+        ort = e.find('div', class_='ort')
+        if ort and "München" not in ort.text:
+            continue
+        found_entities.append({
+            "text": str_sum,
+            "link": link,
+            "hash": hashlib.sha1(str.encode(str_sum)).hexdigest()
+        })
     return found_entities
     
 def getSchneider():
@@ -135,7 +133,7 @@ def getSchneider():
             str_sum += info.text
             str_sum = str_sum + '\n' if (index + 1) % 2 == 0 else str_sum
         link = str(e.find('div',class_='oo-detailslink').find('a', class_='oo-details-btn')['href'])
-        if "BÜROFLÄCHE" in str_sum.upper() or "BÜROHAUS" in str_sum.upper():
+        if "OBJEKTARTWOHNUNG" not in str_sum.upper().replace(" ", ""):
             continue
         found_entities.append({
             "text": str_sum,
@@ -145,7 +143,7 @@ def getSchneider():
     return found_entities
 
 def getRiedel():
-    r = requests.get('https://www.riedel-immobilien.de/angebote/wohnungen-mieten')
+    r = requests.get('https://www.riedel-immobilien.de/angebote/wohnungen-mieten', headers=HEADERS)
     b = bs4.BeautifulSoup(r.text, "html5lib")
     lists = b.find_all('ul', class_='listDefault_varImmobox')
     entries = lists[0].find_all('div', class_='listEntryInner')
@@ -156,6 +154,8 @@ def getRiedel():
         str_sum += str(e.find('div',class_='listEntryLocationShort').text.strip()) + '\n'
         information = str(e.find('div', class_='listEntryObjektdaten').text.strip())
         str_sum += re.sub('\n', '', re.sub(' +', ' ', information)) + '\n'
+        if "BÜRO" in str_sum.upper() or "GEWERBE" in str_sum.upper():
+            continue
         link = 'https://www.riedel-immobilien.de' + str(e.find('a')['href'])
         found_entities.append({
             "text": str_sum,
@@ -176,7 +176,7 @@ def getRogers():
         information = str(e.find('div', class_='post-data').text.strip())
         str_sum += re.sub('\n', '', re.sub(' +', ' ', information)) + '\n'
         link = str(e.find('a',class_='et_pb_button')['href'])
-        if "KAUFPREIS" not in str_sum.upper() and "ERFOLGREICH VERMITTELT" not in str_sum.upper():
+        if "KAUFPREIS" not in str_sum.upper() and "ERFOLGREICH VERMITTELT" not in str_sum.upper() and "BÜRO" not in str_sum.upper() and "GEWERBE" not in str_sum.upper():
             found_entities.append({
                 "text": str_sum,
                 "link": link,
@@ -184,22 +184,36 @@ def getRogers():
             })
     return found_entities
 
-print("Running Script")
+dry_run = '--dry-run' in sys.argv
 
-all_methods = { "aigner": getAigner, "rogers":getRogers, "riedel":getRiedel, "schneider":getSchneider, "hegerich":getHegerich, "gerschlauer":getGerschlauer, "elvira":getElvira}
-# all_methods = { "schneider":getSchneider};
+print("Running Script" + (" (dry run)" if dry_run else ""))
+
+all_methods = { "aigner": getAigner, "rogers":getRogers, "riedel":getRiedel, "schneider":getSchneider, "hegerich":getHegerich, "gerschlauer":getGerschlauer}
 for name, m in all_methods.items():
     try:
         data = m()
         new_entries = compare(data, name)
-        print(new_entries)
+        print(f"{name}: {len(data)} total, {len(new_entries)} new")
+        if dry_run:
+            for e in new_entries:
+                print(f"  - {e['text'].splitlines()[0]}")
+            continue
         if(len(new_entries) > 0):
-            bot = telegram.Bot(token=os.environ['TELEGRAM_TOKEN'])
+            messages = []
             msg_text = 'Neue Ergebnisse von ' + name + '\n\n'
             for e in new_entries:
-                msg_text += e['text'] + '\n' + e['link'] + '\n\n'
+                entry_text = e['text'] + '\n' + e['link'] + '\n\n'
+                if len(msg_text) + len(entry_text) > 4000:
+                    messages.append(msg_text)
+                    msg_text = 'Neue Ergebnisse von ' + name + ' (Forts.)\n\n'
+                msg_text += entry_text
+            messages.append(msg_text)
 
-            bot.send_message(chat_id=os.environ['TELEGRAM_CHAT_ID'],text=msg_text)
-    except:
-        print("Unexpected error:", sys.exc_info()[0])
-        print("could not fetch data from " + name)
+            async def send_all():
+                async with telegram.Bot(token=os.environ['TELEGRAM_TOKEN']) as bot:
+                    for msg in messages:
+                        await bot.send_message(chat_id=os.environ['TELEGRAM_CHAT_ID'], text=msg)
+
+            asyncio.run(send_all())
+    except Exception as ex:
+        print(f"Error fetching {name}: {ex}")
