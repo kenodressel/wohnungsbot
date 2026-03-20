@@ -41,16 +41,17 @@ def format_entry(e):
     lines.append(f"<a href=\"{e['link']}\">→ Exposé</a>")
     return '\n'.join(lines)
 
-def compare(entries, name):
+def compare(entries, name, save=True):
     Path(PICKLE_PATH).mkdir(parents=True, exist_ok=True)
     hashes = set()
     if(os.path.isfile(PICKLE_PATH + name + '.pickle')):
         with open(PICKLE_PATH + name + '.pickle','rb') as f:
             hashes = pickle.load(f)
     new_entries = [e for e in entries if e['hash'] not in hashes]
-    new_hashes = set([e['hash'] for e in new_entries]) | hashes
-    with open(PICKLE_PATH + name + '.pickle','wb') as f:
-            pickle.dump(new_hashes, f)
+    if save:
+        new_hashes = set([e['hash'] for e in new_entries]) | hashes
+        with open(PICKLE_PATH + name + '.pickle','wb') as f:
+                pickle.dump(new_hashes, f)
     return new_entries
 
 def getAigner():
@@ -269,7 +270,7 @@ all_methods = {
 for name, m in all_methods.items():
     try:
         data = m()
-        new_entries = compare(data, name)
+        new_entries = compare(data, name, save=not dry_run)
         print(f"{name}: {len(data)} total, {len(new_entries)} new")
         if dry_run:
             for e in new_entries:
