@@ -14,5 +14,7 @@ RUN pip install -r requirements.txt
 
 COPY cronscript.sh /root/cronscript.sh
 COPY wohnungen.py /root/wohnungen.py
+COPY entrypoint.sh /root/entrypoint.sh
+RUN chmod +x /root/entrypoint.sh /root/cronscript.sh
 
-CMD [ "cron", "-l", "2", "-f" ]
+CMD [ "/root/entrypoint.sh" ]
