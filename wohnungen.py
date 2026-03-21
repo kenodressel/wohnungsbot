@@ -41,18 +41,24 @@ def format_entry(e):
     lines.append(f"<a href=\"{e['link']}\">→ Exposé</a>")
     return '\n'.join(lines)
 
-def compare(entries, name, save=True):
+def compare(entries, name):
     Path(PICKLE_PATH).mkdir(parents=True, exist_ok=True)
     hashes = set()
     if(os.path.isfile(PICKLE_PATH + name + '.pickle')):
         with open(PICKLE_PATH + name + '.pickle','rb') as f:
             hashes = pickle.load(f)
     new_entries = [e for e in entries if e['hash'] not in hashes]
-    if save:
-        new_hashes = set([e['hash'] for e in new_entries]) | hashes
-        with open(PICKLE_PATH + name + '.pickle','wb') as f:
-                pickle.dump(new_hashes, f)
     return new_entries
+
+def save_hashes(entries, name):
+    Path(PICKLE_PATH).mkdir(parents=True, exist_ok=True)
+    hashes = set()
+    if(os.path.isfile(PICKLE_PATH + name + '.pickle')):
+        with open(PICKLE_PATH + name + '.pickle','rb') as f:
+            hashes = pickle.load(f)
+    hashes.update(e['hash'] for e in entries)
+    with open(PICKLE_PATH + name + '.pickle','wb') as f:
+            pickle.dump(hashes, f)
 
 def getAigner():
     data_RAW = {
@@ -270,7 +276,7 @@ all_methods = {
 for name, m in all_methods.items():
     try:
         data = m()
-        new_entries = compare(data, name, save=not dry_run)
+        new_entries = compare(data, name)
         print(f"{name}: {len(data)} total, {len(new_entries)} new")
         if dry_run:
             for e in new_entries:
@@ -299,5 +305,6 @@ for name, m in all_methods.items():
                         )
 
             asyncio.run(send_all())
+        save_hashes(data, name)
     except Exception as ex:
         print(f"Error fetching {name}: {ex}")
