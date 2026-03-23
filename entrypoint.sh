@@ -1,5 +1,6 @@
 #!/bin/bash
 env >> /etc/environment
+cd /root
 
 MARKER="/root/data/.migrated_to_link_ids"
 if [ ! -f "$MARKER" ]; then
