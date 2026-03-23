@@ -1,5 +1,6 @@
 import os
 import sqlite3
+import time
 import bs4
 import requests
 import telegram
@@ -9,6 +10,7 @@ import sys
 from pathlib import Path
 
 DB_PATH = './data/listings.db'
+INTERVAL = 3600
 HEADERS = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'}
 
 def get_db():
@@ -267,15 +269,7 @@ def getWsb():
 if __name__ != '__main__':
     raise SystemExit
 
-dry_run = '--dry-run' in sys.argv
-seed = '--seed' in sys.argv
-
-mode = " (dry run)" if dry_run else " (seed)" if seed else ""
-print(f"Running Script{mode}")
-
-db = get_db()
-
-all_methods = {
+ALL_METHODS = {
     "Aigner": getAigner,
     "Rogers": getRogers,
     "Riedel": getRiedel,
@@ -285,51 +279,72 @@ all_methods = {
     "ALSAOL": getAlsaol,
     "WSB Bayern": getWsb,
 }
-seed_errors = False
-for name, m in all_methods.items():
-    try:
-        data = m()
-        if seed:
+
+def run_once(db, dry_run=False):
+    for name, m in ALL_METHODS.items():
+        try:
+            data = m()
+            new_entries = compare(db, data, name)
+            print(f"{name}: {len(data)} total, {len(new_entries)} new")
+            if dry_run:
+                for e in new_entries:
+                    print(f"  - {e['title']}")
+                continue
+            if len(new_entries) > 0:
+                messages = []
+                header = f"<b>Neue Mietwohnungen von {name}</b>\n"
+                msg_text = header + '\n'
+                for e in new_entries:
+                    entry_text = format_entry(e) + '\n\n'
+                    if len(msg_text) + len(entry_text) > 4000:
+                        messages.append(msg_text)
+                        msg_text = header + ' (Forts.)\n\n'
+                    msg_text += entry_text
+                messages.append(msg_text)
+
+                async def send_all(msgs=messages):
+                    async with telegram.Bot(token=os.environ['TELEGRAM_TOKEN']) as bot:
+                        for msg in msgs:
+                            await bot.send_message(
+                                chat_id=os.environ['TELEGRAM_CHAT_ID'],
+                                text=msg,
+                                parse_mode='HTML',
+                                disable_web_page_preview=True
+                            )
+
+                asyncio.run(send_all())
             save_listings(db, data, name)
-            print(f"{name}: seeded {len(data)} entries")
-            continue
-        new_entries = compare(db, data, name)
-        print(f"{name}: {len(data)} total, {len(new_entries)} new")
-        if dry_run:
-            for e in new_entries:
-                print(f"  - {e['title']}")
-            continue
-        if len(new_entries) > 0:
-            messages = []
-            header = f"<b>Neue Mietwohnungen von {name}</b>\n"
-            msg_text = header + '\n'
-            for e in new_entries:
-                entry_text = format_entry(e) + '\n\n'
-                if len(msg_text) + len(entry_text) > 4000:
-                    messages.append(msg_text)
-                    msg_text = header + ' (Forts.)\n\n'
-                msg_text += entry_text
-            messages.append(msg_text)
+        except Exception as ex:
+            print(f"Error fetching {name}: {ex}")
 
-            async def send_all(msgs=messages):
-                async with telegram.Bot(token=os.environ['TELEGRAM_TOKEN']) as bot:
-                    for msg in msgs:
-                        await bot.send_message(
-                            chat_id=os.environ['TELEGRAM_CHAT_ID'],
-                            text=msg,
-                            parse_mode='HTML',
-                            disable_web_page_preview=True
-                        )
+dry_run = '--dry-run' in sys.argv
+seed = '--seed' in sys.argv
 
-            asyncio.run(send_all())
-        save_listings(db, data, name)
-    except Exception as ex:
-        print(f"Error fetching {name}: {ex}")
-        if seed:
-            seed_errors = True
+db = get_db()
 
-db.close()
-
-if seed and seed_errors:
-    print("Seed completed with errors.")
-    sys.exit(1)
+if seed or dry_run:
+    mode = "dry run" if dry_run else "seed"
+    print(f"Running Script ({mode})")
+    if seed:
+        for name, m in ALL_METHODS.items():
+            try:
+                data = m()
+                save_listings(db, data, name)
+                print(f"{name}: seeded {len(data)} entries")
+            except Exception as ex:
+                print(f"Error fetching {name}: {ex}")
+                db.close()
+                sys.exit(1)
+    else:
+        run_once(db, dry_run=True)
+    db.close()
+else:
+    print(f"Starting wohnungsbot (interval: {INTERVAL}s)")
+    sys.stdout.flush()
+    while True:
+        print(f"Running check...")
+        sys.stdout.flush()
+        run_once(db)
+        print(f"Done. Next check in {INTERVAL}s.")
+        sys.stdout.flush()
+        time.sleep(INTERVAL)
