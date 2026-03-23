@@ -1,16 +1,33 @@
 import os
-import pickle
+import sqlite3
 import bs4
 import requests
-import hashlib
 import telegram
 import asyncio
 import re
 import sys
 from pathlib import Path
 
-PICKLE_PATH = './data/'
+DB_PATH = './data/listings.db'
 HEADERS = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'}
+
+def get_db():
+    Path(os.path.dirname(DB_PATH)).mkdir(parents=True, exist_ok=True)
+    db = sqlite3.connect(DB_PATH)
+    db.execute('''CREATE TABLE IF NOT EXISTS listings (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        source TEXT NOT NULL,
+        title TEXT,
+        link TEXT UNIQUE,
+        price TEXT,
+        location TEXT,
+        size TEXT,
+        rooms TEXT,
+        first_seen TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        last_seen TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )''')
+    db.commit()
+    return db
 
 def entry(title, link, price=None, location=None, size=None, rooms=None):
     return {
@@ -20,7 +37,6 @@ def entry(title, link, price=None, location=None, size=None, rooms=None):
         "size": size.strip() if size else None,
         "rooms": rooms.strip() if rooms else None,
         "link": link.strip(),
-        "id": hashlib.sha1(link.strip().encode()).hexdigest()
     }
 
 def format_entry(e):
@@ -40,24 +56,17 @@ def format_entry(e):
     lines.append(f"<a href=\"{e['link']}\">→ Exposé</a>")
     return '\n'.join(lines)
 
-def compare(entries, name):
-    Path(PICKLE_PATH).mkdir(parents=True, exist_ok=True)
-    hashes = set()
-    if(os.path.isfile(PICKLE_PATH + name + '.pickle')):
-        with open(PICKLE_PATH + name + '.pickle','rb') as f:
-            hashes = pickle.load(f)
-    new_entries = [e for e in entries if e['id'] not in hashes]
-    return new_entries
+def compare(db, entries, name):
+    known = {row[0] for row in db.execute('SELECT link FROM listings WHERE source = ?', (name,))}
+    return [e for e in entries if e['link'] not in known]
 
-def save_hashes(entries, name):
-    Path(PICKLE_PATH).mkdir(parents=True, exist_ok=True)
-    hashes = set()
-    if(os.path.isfile(PICKLE_PATH + name + '.pickle')):
-        with open(PICKLE_PATH + name + '.pickle','rb') as f:
-            hashes = pickle.load(f)
-    hashes.update(e['id'] for e in entries)
-    with open(PICKLE_PATH + name + '.pickle','wb') as f:
-            pickle.dump(hashes, f)
+def save_listings(db, entries, name):
+    for e in entries:
+        db.execute('''INSERT INTO listings (source, title, link, price, location, size, rooms)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(link) DO UPDATE SET last_seen = CURRENT_TIMESTAMP''',
+            (name, e['title'], e['link'], e.get('price'), e.get('location'), e.get('size'), e.get('rooms')))
+    db.commit()
 
 def getAigner():
     data_RAW = {
@@ -264,6 +273,8 @@ seed = '--seed' in sys.argv
 mode = " (dry run)" if dry_run else " (seed)" if seed else ""
 print(f"Running Script{mode}")
 
+db = get_db()
+
 all_methods = {
     "Aigner": getAigner,
     "Rogers": getRogers,
@@ -279,10 +290,10 @@ for name, m in all_methods.items():
     try:
         data = m()
         if seed:
-            save_hashes(data, name)
+            save_listings(db, data, name)
             print(f"{name}: seeded {len(data)} entries")
             continue
-        new_entries = compare(data, name)
+        new_entries = compare(db, data, name)
         print(f"{name}: {len(data)} total, {len(new_entries)} new")
         if dry_run:
             for e in new_entries:
@@ -311,11 +322,13 @@ for name, m in all_methods.items():
                         )
 
             asyncio.run(send_all())
-        save_hashes(data, name)
+        save_listings(db, data, name)
     except Exception as ex:
         print(f"Error fetching {name}: {ex}")
         if seed:
             seed_errors = True
+
+db.close()
 
 if seed and seed_errors:
     print("Seed completed with errors.")

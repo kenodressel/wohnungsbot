@@ -2,9 +2,9 @@
 env >> /etc/environment
 cd /root
 
-MARKER="/root/data/.migrated_to_link_ids"
+MARKER="/root/data/.migrated_to_sqlite"
 if [ ! -f "$MARKER" ]; then
-    echo "First run: seeding link-based IDs..."
+    echo "First run: seeding SQLite database..."
     /usr/local/bin/python -u /root/wohnungen.py --seed
     if [ $? -eq 0 ]; then
         touch "$MARKER"
