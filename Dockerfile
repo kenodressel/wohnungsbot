@@ -17,4 +17,6 @@ COPY wohnungen.py /root/wohnungen.py
 COPY entrypoint.sh /root/entrypoint.sh
 RUN chmod +x /root/entrypoint.sh /root/cronscript.sh
 
+WORKDIR /root
+
 CMD [ "/root/entrypoint.sh" ]
