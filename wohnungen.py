@@ -13,7 +13,6 @@ PICKLE_PATH = './data/'
 HEADERS = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'}
 
 def entry(title, link, price=None, location=None, size=None, rooms=None):
-    hash_src = f"{title}{price}{size}{rooms}"
     return {
         "title": title.strip(),
         "price": price.strip() if price else None,
@@ -21,7 +20,7 @@ def entry(title, link, price=None, location=None, size=None, rooms=None):
         "size": size.strip() if size else None,
         "rooms": rooms.strip() if rooms else None,
         "link": link.strip(),
-        "hash": hashlib.sha1(hash_src.encode()).hexdigest()
+        "id": hashlib.sha1(link.strip().encode()).hexdigest()
     }
 
 def format_entry(e):
@@ -47,7 +46,7 @@ def compare(entries, name):
     if(os.path.isfile(PICKLE_PATH + name + '.pickle')):
         with open(PICKLE_PATH + name + '.pickle','rb') as f:
             hashes = pickle.load(f)
-    new_entries = [e for e in entries if e['hash'] not in hashes]
+    new_entries = [e for e in entries if e['id'] not in hashes]
     return new_entries
 
 def save_hashes(entries, name):
@@ -56,7 +55,7 @@ def save_hashes(entries, name):
     if(os.path.isfile(PICKLE_PATH + name + '.pickle')):
         with open(PICKLE_PATH + name + '.pickle','rb') as f:
             hashes = pickle.load(f)
-    hashes.update(e['hash'] for e in entries)
+    hashes.update(e['id'] for e in entries)
     with open(PICKLE_PATH + name + '.pickle','wb') as f:
             pickle.dump(hashes, f)
 
@@ -260,8 +259,10 @@ if __name__ != '__main__':
     raise SystemExit
 
 dry_run = '--dry-run' in sys.argv
+seed = '--seed' in sys.argv
 
-print("Running Script" + (" (dry run)" if dry_run else ""))
+mode = " (dry run)" if dry_run else " (seed)" if seed else ""
+print(f"Running Script{mode}")
 
 all_methods = {
     "Aigner": getAigner,
@@ -273,9 +274,14 @@ all_methods = {
     "ALSAOL": getAlsaol,
     "WSB Bayern": getWsb,
 }
+seed_errors = False
 for name, m in all_methods.items():
     try:
         data = m()
+        if seed:
+            save_hashes(data, name)
+            print(f"{name}: seeded {len(data)} entries")
+            continue
         new_entries = compare(data, name)
         print(f"{name}: {len(data)} total, {len(new_entries)} new")
         if dry_run:
@@ -308,3 +314,9 @@ for name, m in all_methods.items():
         save_hashes(data, name)
     except Exception as ex:
         print(f"Error fetching {name}: {ex}")
+        if seed:
+            seed_errors = True
+
+if seed and seed_errors:
+    print("Seed completed with errors.")
+    sys.exit(1)
