@@ -59,8 +59,9 @@ def format_entry(e):
     return '\n'.join(lines)
 
 def compare(db, entries, name):
-    known = {row[0] for row in db.execute('SELECT link FROM listings WHERE source = ?', (name,))}
-    return [e for e in entries if e['link'] not in known]
+    known_links = {row[0] for row in db.execute('SELECT link FROM listings WHERE source = ?', (name,))}
+    known_titles = {(row[0], row[1]) for row in db.execute('SELECT title, price FROM listings WHERE source = ?', (name,))}
+    return [e for e in entries if e['link'] not in known_links and (e['title'], e.get('price')) not in known_titles]
 
 def save_listings(db, entries, name):
     for e in entries:
