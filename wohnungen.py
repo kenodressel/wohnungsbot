@@ -265,6 +265,80 @@ def getWsb():
             ))
     return found
 
+def getNiederl():
+    r = requests.get('https://www.niederl-immobilien.de/angebote-miete', headers=HEADERS)
+    b = bs4.BeautifulSoup(r.text, "html5lib")
+    container = b.find('div', class_='angebote')
+    found = []
+    if not container:
+        return found
+    for e in container.find_all('article'):
+        header = e.find('header')
+        link_tag = header.find('a') if header else e.find('a')
+        if not link_tag or not link_tag.has_attr('href'):
+            continue
+        highlight = link_tag.find('span', class_='highlight')
+        status = highlight.get_text(strip=True).upper() if highlight else ''
+        if any(x in status for x in ['VERKAUFT', 'VERMIETET', 'RESERVIERT']):
+            continue
+        if highlight:
+            highlight.extract()
+        title = re.sub(r'\s+', ' ', link_tag.get_text()).strip()
+        if any(x in title.upper() for x in ['BÜRO', 'GEWERBE']):
+            continue
+        rows = {}
+        table = e.find('table')
+        if table:
+            for tr in table.find_all('tr'):
+                tds = tr.find_all('td')
+                if len(tds) >= 2:
+                    key = re.sub(r'\s+', ' ', tds[0].get_text()).strip()
+                    rows[key] = re.sub(r'\s+', ' ', tds[1].get_text()).strip()
+        price = None
+        for k, v in rows.items():
+            if 'miete' in k.lower() or 'preis' in k.lower():
+                price = v
+                break
+        location = ' '.join(x for x in [rows.get('Postleitzahl'), rows.get('Stadt/Kreis')] if x).strip()
+        rooms = rows.get('Zimmer')
+        found.append(entry(
+            title=title,
+            location=location or rows.get('Straße'),
+            price=price,
+            size=rows.get('Wohnfläche'),
+            rooms=(rooms + ' Zi.') if rooms else None,
+            link='https://www.niederl-immobilien.de' + link_tag['href']
+        ))
+    return found
+
+def getPflug():
+    r = requests.get('https://pflug-immobilien.de/', headers=HEADERS)
+    b = bs4.BeautifulSoup(r.text, "html5lib")
+    found = []
+    for c in b.select('div.card.immo-profile'):
+        rows = {}
+        for tr in c.select('table tr'):
+            tds = tr.find_all('td')
+            if len(tds) >= 2:
+                rows[tds[0].get_text(strip=True)] = re.sub(r'\s+', ' ', tds[1].get_text()).strip()
+        if rows.get('Typ', '').lower() != 'mieten':
+            continue
+        district = c.find('h3').get_text(strip=True) if c.find('h3') else ''
+        desc = c.find('p').get_text(strip=True) if c.find('p') else ''
+        adresse = rows.get('Adresse', '')
+        rooms = rows.get('Zimmer')
+        size = rows.get('Wohnfläche ca.') or rows.get('Wohnfläche')
+        slug = re.sub(r'[^a-z0-9]+', '-', f"{district}-{adresse}-{size or ''}".lower()).strip('-')
+        found.append(entry(
+            title=desc or district,
+            location=' · '.join(x for x in [district, adresse] if x) or None,
+            price=rows.get('Warmmiete') or rows.get('Kaltmiete') or rows.get('Miete') or rows.get('Preis'),
+            size=size,
+            rooms=(rooms + ' Zi.') if rooms else None,
+            link='https://pflug-immobilien.de/#' + slug
+        ))
+    return found
+
 # --- Main ---
 
 if __name__ != '__main__':
@@ -279,6 +353,8 @@ ALL_METHODS = {
     "Gerschlauer": getGerschlauer,
     "ALSAOL": getAlsaol,
     "WSB Bayern": getWsb,
+    "Niederl": getNiederl,
+    "Pflug": getPflug,
 }
 
 def run_once(db, dry_run=False):
